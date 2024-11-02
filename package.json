@@ -1,0 +1,28 @@
+{
+  "name": "Proyecto",
+  "version": "1.0.0",
+  "description": "Repositorio para el desarrollo del proyecto 1 de Desarrollo de Software, por Anderson Alban.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ajred96/Proyecto1DSIII.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ajred96/Proyecto1DSIII/issues"
+  },
+  "homepage": "https://github.com/Ajred96/Proyecto1DSIII#readme",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "circuit-breaker-js": "0.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "prom-client": "^15.1.3"
+  }
+}
