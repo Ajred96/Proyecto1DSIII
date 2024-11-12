@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: mysql # This should match the labels in the MySQL pod
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+      nodePort: 30002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-d
+  namespace: default
+  # labels:
+  #   app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql # This should match the labels in the pod template
+  template:
+    metadata:
+      labels:
+        app: mysql # The label that your stock app will look for
+    spec:
+      #imagePullSecrets:
+      # - name: github-registry-key
+      # initContainers: # Init container to check if MySQL service is available
+      #   - name: wait-for-mysql-service
+      #     image: busybox
+      #     command: ['sh', '-c', 'until nc -z mysql-service 3306; do echo waiting for MySQL service; sleep 5; done;'] # Loop until service is available
+      containers:
+        - name: mysql
+          image: mysql:8
+          ports:
+            - containerPort: 3306
+
+          env:
+            - name: MYSQL_DATABASE
+              value: stock
+            # - name: MYSQL_USER
+            #   value: root
+            # - name: MYSQL_PASSWORD
+            #   value: root
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-service
+  namespace: default
+  # selector:
+  #   app: stock-app
+spec:
+  type: LoadBalancer # IP cluster is the default
+  #type: LoadBalancer
+  selector:
+    app: stock-app
+  ports:
+    - protocol: TCP
+      port: 80 #service port
+      targetPort: 8090 #containerPort and targetPort have to match
+      nodePort: 30001
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-d
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-app # This label should match the service selector
+  template:
+    metadata:
+      labels:
+        app: stock-app # This label identifies the app's pods
+    spec:
+      #imagePullSecrets:
+      # - name: github-registry-key
+      # initContainers: # Init container to check MySQL readiness
+      #   - name: wait-for-mysql
+      #     image: busybox
+      #     command: [
+      #         "sh",
+      #         "-c",
+      #         "until nc -z stock-service 80; do echo waiting for stock-se; sleep 5; done;",
+      #       ] # Checks if stock service is ready
+      containers:
+        - name: stock-container
+          #image: gamberfox/lab-app:latest
+          image: gamberfox/ms-stock:latest
+          ports:
+            - containerPort: 8090
+          env:
+            # - name: DB_URL
+            # value: jdbc:mysql://mysql:3306/stock # Ensure this matches your MySQL service
+            - name: DB_URL
+              value: jdbc:mysql://mysql-service:3306/stock
+            - name: DB_USERNAME
+              value: root
+            - name: DB_PASSWORD
+              value: root
+          # readinessProbe: # Readiness probe ensures the pod only becomes ready when the service is available
+          #   httpGet:
+          #     path: /health # Replace with the appropriate health check path for your app
+          #     port: 8090
+          #   initialDelaySeconds: 15 # Wait for 10 seconds before checking readiness
+          #   periodSeconds: 10 # Check every 5 seconds
+          #   failureThreshold: 4 # Fail if 3 consecutive checks fail

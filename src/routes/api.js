@@ -14,6 +14,7 @@ router.post('/auth', authController.authenticate);
 // Rutas de inventario
 router.get('/inventory', inventoryController.getInventory);
 router.post('/inventory/update', inventoryController.update);
+router.get('')
 
 router.post('/order', sagaMiddleware, (req, res) => {
     const { action, payload } = req.body;
@@ -35,5 +36,6 @@ router.post('/payment', paymentController.processPayment);
 
 // Rutas de favoritos
 router.get('/favorites', favoritesController.getFavorites);
+
 
 module.exports = router;
