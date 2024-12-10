@@ -194,6 +194,102 @@ const options = {
                     },
                 }
             },
+            "/registrarUsuario": {
+                post: {
+                    tags: [
+                        "Authentication Microservice"
+                    ],
+                    summary: "Create a new user to the app",
+                    description: "Create a user to the app",
+                    requestBody: {
+                        description: "Create a user in the app",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/user"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/user"
+                                    }
+                                },
+                            }
+                        },
+                    },
+                }
+            },
+            "/identificarUsuario": {
+                post: {
+                    tags: [
+                        "Authentication Microservice"
+                    ],
+                    summary: "Validate that the user entered is the correct one",
+                    description: "Validate that the user entered is the correct one",
+                    requestBody: {
+                        description: "Validate that the user entered is the correct one",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/userLogin"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/userLogin"
+                                    }
+                                },
+                            }
+                        },
+                    },
+                }
+            },
+            "/validarToken": {
+                post: {
+                    tags: [
+                        "Authentication Microservice"
+                    ],
+                    summary: "Validate that the token is valid",
+                    description: "Validate that the token is valid",
+                    requestBody: {
+                        description: "Validate that the token is valid",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/token"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/token"
+                                    }
+                                },
+                            }
+                        },
+                    },
+                }
+            },
         },
         components: {
             schemas: {
@@ -265,6 +361,49 @@ const options = {
                             example: "marca"
                         },
                         description: {
+                            type: "string",
+                            example: "string"
+                        }
+                    },
+                },
+                user: {
+                    type: "object",
+                    properties: {
+                        nombre: {
+                            type: "string",
+                            example: "string"
+                        },
+                        correo: {
+                            type: "string",
+                            example: "string"
+                        },
+                        clave: {
+                            type: "string",
+                            example: "string"
+                        },
+                        celular: {
+                            type: "string",
+                            example: "string"
+                        }
+                    },
+                },
+                userLogin: {
+                    type: "object",
+                    properties: {
+                        correo: {
+                            type: "string",
+                            example: "string"
+                        },
+                        clave: {
+                            type: "string",
+                            example: "string"
+                        }
+                    },
+                },
+                token: {
+                    type: "object",
+                    properties: {
+                        token: {
                             type: "string",
                             example: "string"
                         }
