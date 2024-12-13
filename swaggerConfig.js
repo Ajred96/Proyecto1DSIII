@@ -44,6 +44,10 @@ const options = {
             {
                 "name": "Authentication Microservice",
                 "description": "It allows you to log in and obtain a token with which to make requests to the other microservices, providing a layer of security to operations"
+            },
+            {
+                "name": "Favorites Microservice",
+                "description": "Allows you to create and update favorites articles"
             }
         ],
         paths: {
@@ -56,25 +60,29 @@ const options = {
                     description: "Get all articles",
                     responses: {
                         200: {
-                            description: "OK",
+                            description: "List of articles retrieved successfully",
                             content: {
-                                "*/*": {
+                                "application/json": {
                                     schema: {
-                                        "$ref": "*/*"
+                                        type: "array",
+                                        items: {
+                                            "$ref": "#/components/schemas/article"
+                                        }
                                     }
                                 }
                             }
                         },
+                        500: {description: "Server error"}
                     },
                 },
                 post: {
                     tags: [
                         "Stock Microservice"
                     ],
-                    summary: "Add a new article to the stock",
-                    description: "Add a new article to the stock",
+                    summary: "Add a new article",
+                    description: "Add a new article to the stock inventory",
                     requestBody: {
-                        description: "Create a new article in the stock",
+                        description: "Payload to create a new article",
                         content: {
                             "application/json": {
                                 schema: {
@@ -86,7 +94,7 @@ const options = {
                     },
                     responses: {
                         200: {
-                            description: "OK",
+                            description: "Article created successfully",
                             content: {
                                 "application/json": {
                                     schema: {
@@ -95,6 +103,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -127,6 +138,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -159,6 +173,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -191,6 +208,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -223,6 +243,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -255,6 +278,9 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -287,6 +313,149 @@ const options = {
                                 },
                             }
                         },
+                        400: {
+                            description: "Invalid request payload"
+                        }
+                    },
+                }
+            },
+            "/obtenerFavoritos/{userId}": {
+                get: {
+                    tags: [
+                        "Favorites Microservice"
+                    ],
+                    summary: "Get all favorites by user",
+                    description: "Get all favorites by user",
+                    parameters: [
+                        {
+                            "name": "userId",
+                            "in": "path",
+                            "description": "ID of the user to retrieve favorites for",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/favoritesByUser"
+                                    }
+                                },
+                            }
+                        },
+                        404: {
+                            description: "User not found"
+                        }
+                    },
+                }
+            },
+            "/crearFavorito": {
+                post: {
+                    tags: [
+                        "Favorites Microservice"
+                    ],
+                    summary: "Create a new favorites by user id",
+                    description: "Create a new favorites by user id",
+                    requestBody: {
+                        description: "Create a new favorites by user id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/favorite"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/favorite"
+                                    }
+                                },
+                            }
+                        },
+                        400: {
+                            description: "Invalid request payload"
+                        }
+                    },
+                }
+            },
+            "/actualizarFavorito": {
+                patch: {
+                    tags: [
+                        "Favorites Microservice"
+                    ],
+                    summary: "Update a favorite by user id",
+                    description: "Update a favorite by user id",
+                    requestBody: {
+                        description: "Update a favorite by user id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/favoriteUpdate"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/favoriteUpdate"
+                                    }
+                                },
+                            }
+                        },
+                        400: {
+                            description: "Invalid request payload"
+                        }
+                    },
+                }
+            },
+            "/borrarFavorito": {
+                post: {
+                    tags: [
+                        "Favorites Microservice"
+                    ],
+                    summary: "Delete a new favorite by user id",
+                    description: "Delete a new favorite by user id",
+                    requestBody: {
+                        description: "Delete a new favorite by user id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/favoriteDelete"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/favoriteDelete"
+                                    }
+                                },
+                            }
+                        },
+                        400: {
+                            description: "Invalid request payload"
+                        }
                     },
                 }
             },
@@ -406,6 +575,68 @@ const options = {
                         token: {
                             type: "string",
                             example: "string"
+                        }
+                    },
+                },
+                favoritesByUser: {
+                    type: "object",
+                    properties: {
+                        productIds: {
+                            productIds: {
+                                type: "object",
+                                example: [
+                                    {
+                                        "productId": "prod123",
+                                        "descripcion": "Nueva descripción del producto nueva :v"
+                                    }
+                                ]
+                            },
+                        }
+                    }
+                },
+                favorite: {
+                    type: "object",
+                    properties: {
+                        userId: {
+                            type: "string",
+                            example: "user123"
+                        },
+                        product: {
+                            type: "object",
+                            example: {
+                                productId: "prod123",
+                                descripcion: "Producto favorito"
+                            }
+                        }
+                    },
+                },
+                favoriteUpdate: {
+                    type: "object",
+                    properties: {
+                        userId: {
+                            type: "string",
+                            example: "user123"
+                        },
+                        productId: {
+                            type: "string",
+                            example: "prod123"
+                        },
+                        newDescripcion: {
+                            type: "string",
+                            example: "Nueva descripcion"
+                        }
+                    },
+                },
+                favoriteDelete: {
+                    type: "object",
+                    properties: {
+                        userId: {
+                            type: "string",
+                            example: "user123"
+                        },
+                        productId: {
+                            type: "string",
+                            example: "prod123"
                         }
                     },
                 },

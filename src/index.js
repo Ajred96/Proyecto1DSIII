@@ -65,6 +65,7 @@ const compensate = async () => {
     }
 };*/
 
+
 // Rutas de inventario
 app.get('/productos', async (req, res) => {
     try {
@@ -152,10 +153,81 @@ app.post('/marcas', async (req, res) => {
     }
 });
 
+
 // Rutas de Compras
 /*app.post('/order', sagaMiddleware, (req, res) => {
     console.log('saga res: ', JSON.stringify(res))
+});
+app.get('/obtenerCompras', async (req, res) => {
+    try {
+        // Realiza una solicitud a la URL contenida en `path`
+        const path = 'http://compras-service/compras';
+        const response = await axios.get(path);
+        res.json(response.data); // Devuelve la respuesta obtenida
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the get orders',
+            details: error.response?.data || 'No additional error data get orders'
+        });
+    }
+});
+
+app.post('/crearCompra', async (req, res) => {
+    try {
+        const path = 'http://compras-service/compras';
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.post(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path create orders',
+            details: error.response?.data || 'No additional error data create orders'
+        });
+    }
+});
+
+app.put('/actualizarCompra/:id', async (req, res) => {
+    try {
+        const {id} = req.params;
+        const path = `http://compras-service/compras/${id}`;
+        const body = req.body; // Captura el body de la solicitud PUT
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.put(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path update orders',
+            details: error.response?.data || 'No additional error data update orders'
+        });
+    }
+});
+
+app.delete('/borrarCompra/:id', async (req, res) => {
+    try {
+        const {id} = req.params;
+        const path = `http://compras-service/compras/${id}`;
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.put(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path delete orders',
+            details: error.response?.data || 'No additional error data delete orders'
+        });
+    }
 });*/
+
 
 // Rutas de Autenticación
 app.post('/validarToken', async (req, res) => {
@@ -212,8 +284,129 @@ app.post('/identificarUsuario', async (req, res) => {
     }
 });
 
+
 // Rutas de pagos
-/*app.post('/payment', processPayment);*/
+/*app.get('/obtenerPago/:id', async (req, res) => {
+    try {
+        const {id} = req.params;
+        const path = `http://pagos-service/pagos/${id}`;
+        const response = await axios.get(path);
+        res.json(response.data); // Devuelve la respuesta obtenida
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the get payment',
+            details: error.response?.data || 'No additional error data get payment'
+        });
+    }
+});
+
+app.post('/crearPago', async (req, res) => {
+    try {
+        const path = 'http://pagos-service/pagos';
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.post(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path create payment',
+            details: error.response?.data || 'No additional error data create payment'
+        });
+    }
+});
+
+app.post('/procesarPago/:id', async (req, res) => {
+    try {
+        const {id} = req.params;
+        const path = `http://pagos-service/pagos/${id}/procesar`;
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.post(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path process payment',
+            details: error.response?.data || 'No additional error data process payment'
+        });
+    }
+});*/
+
+
+// Rutas de favoritos
+app.get('/obtenerFavoritos/:id', async (req, res) => {
+    try {
+        // Realiza una solicitud a la URL contenida en `path`
+        const {id} = req.params;
+        const path = `http://favorites-service/favorites/${id}`;
+        const response = await axios.get(path);
+        res.json(response.data); // Devuelve la respuesta obtenida
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the get favorites',
+            details: error.response?.data || 'No additional error data get favorites'
+        });
+    }
+});
+
+app.post('/crearFavorito', async (req, res) => {
+    try {
+        const path = `http://favorites-service/favorites`;
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.post(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path create favorites',
+            details: error.response?.data || 'No additional error data create favorites'
+        });
+    }
+});
+
+app.patch('/actualizarFavorito', async (req, res) => {
+    try {
+        const path = `http://favorites-service/favorites`;
+        const body = req.body; // Captura el body de la solicitud PUT
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.patch(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path update favorites',
+            details: error.response?.data || 'No additional error data update favorites'
+        });
+    }
+});
+
+app.post('/borrarFavorito', async (req, res) => {
+    try {
+        const path = `http://favorites-service/favorites/delete`;
+        const body = req.body; // Captura el body de la solicitud POST
+
+        // Realiza la solicitud POST con axios, adjuntando el body
+        const response = await axios.post(path, body);
+
+        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({
+            error: 'Error connecting to the provided path delete favorites',
+            details: error.response?.data || 'No additional error data delete favorites'
+        });
+    }
+});
 
 // Exponer métricas para Prometheus
 app.get('/metrics', async (req, res) => {
