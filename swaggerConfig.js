@@ -34,12 +34,8 @@ const options = {
                 "description": "It allows you to create brands, categorizes, articles, update articles and consult them.",
             },
             {
-                "name": "Order Microservice",
-                "description": "Allows you to create and update purchase orders",
-            },
-            {
-                "name": "Payment Microservice",
-                "description": "Allows you to create and update payment processes"
+                "name": "Order & Payment Simulation",
+                "description": "Allows you to create and update purchase orders & payments",
             },
             {
                 "name": "Authentication Microservice",
@@ -108,6 +104,42 @@ const options = {
                         }
                     },
                 }
+            },
+            "/productos/{id}": {
+                get: {
+                    tags: [
+                        "Stock Microservice"
+                    ],
+                    summary: "Get article by id",
+                    description: "Get article by id",
+                    parameters: [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "description": "ID of the article to retrieve stock for",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "List article by id successfully",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "array",
+                                        items: {
+                                            "$ref": "#/components/schemas/article"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        500: {description: "Server error"}
+                    },
+                },
             },
             "/actualizarProductos": {
                 put: {
@@ -459,6 +491,48 @@ const options = {
                     },
                 }
             },
+            "/realizarCompra": {
+                post: {
+                    tags: [
+                        "Order & Payment Simulation"
+                    ],
+                    summary: "Create a new order with all business logic",
+                    description: "Create a new order, then create a new payment, update the article in the stock, but if something of the microservice faild, do the compensation",
+                    requestBody: {
+                        description: "Create a new order with all business logic",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/purchaseRequest"
+                                }
+                            },
+                        },
+                        required: true
+                    },
+                    responses: {
+                        200: {
+                            description: "OK",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/purchaseResponse"
+                                    }
+                                },
+                            }
+                        },
+                        400: {
+                            description: "FAILD",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/purchaseErrorResponse"
+                                    }
+                                },
+                            }
+                        }
+                    },
+                }
+            },
         },
         components: {
             schemas: {
@@ -640,6 +714,67 @@ const options = {
                         }
                     },
                 },
+                purchaseRequest: {
+                    type: "object",
+                    properties: {
+                        token: {
+                            type: "object",
+                            example: {
+                                "token": 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub21icmUiOiJBbmRlcnNvbiBKb2hhbiBBbGJhbiBBbmd1bG8iLCJpZCI6IjY3NWExOWYwOTY3NWQyZmNlNTZjMTJjMyIsImlkX3JvbCI6IjY3NThkODJmOTY3NWQyNTA2YzZjMTJiYiIsImV4cCI6MTczNDIwMjczOX0.jL_FkSfFqb7uryJF4V07EbuT2WVPTT2e2MDd4pcN8Ms'
+                            }
+                        },
+                        productos: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    "id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cantidadComprada": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                }
+                            }
+                        },
+                        total: {
+                            type: "integer",
+                            example: 50000
+                        }
+                    }
+                },
+                purchaseResponse: {
+                    type: "object",
+                    properties: {
+                        message: {
+                            type: "string",
+                            example: "Transacción completada exitosamente."
+                        },
+                        purchaseId: {
+                            type: "string",
+                            example: "eb8f371c-d07d-47ac-bd4e-ccff9541c424"
+                        },
+                        paymentId: {
+                            type: "string",
+                            example: "69f140f6-a532-49d4-9b0c-7bcf8247ffd8"
+                        }
+                    }
+                },
+                purchaseErrorResponse: {
+                    type: "object",
+                    properties: {
+                        error: {
+                            "type": "string",
+                            "example": "Transacción fallida. Se realizaron compensaciones."
+                        },
+                        details: {
+                            "type": "string",
+                            "example": "Token inválido"
+                        }
+                    }
+                }
             },
         }
     },

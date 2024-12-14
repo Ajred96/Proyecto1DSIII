@@ -1,418 +1,285 @@
+require('./tracing');
+
 require('dotenv').config();
 const express = require('express');
-const promClient = require('./utils/prometheus');
 const axios = require('axios');
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('../swaggerConfig');
-
 const {json} = require("express");
+const {v4: uuidv4} = require('uuid');
 
+const {setupMetrics} = require('./utils/prometheus');
+const logger = require('./logger');
+const expressWinston = require('express-winston');
+const swaggerSpec = require('../swaggerConfig');
+const config = require('./config');
+
+// Inicializar Express
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// // Middleware para analizar el cuerpo de las solicitudes
 app.use(express.json());
 
+// Middleware para generar un UUID en cada solicitud
+app.use((req, res, next) => {
+    req.id = uuidv4();
+    logger.info(`Request ID: ${req.id}`);
+    next();
+});
+
+// Middleware para registrar todas las solicitudes
+app.use(expressWinston.logger({
+    winstonInstance: logger,
+    meta: true,
+    msg: "HTTP {{req.method}} {{req.url}} | Request ID: {{req.id}}",
+    expressFormat: true,
+    colorize: false
+}));
+
+// Registrar errores en caso de fallo
+app.use(expressWinston.errorLogger({
+    winstonInstance: logger
+}));
+
+// Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-/*const sagaMiddleware = async (req, res, next) => {
-    const {action, payload, producto} = req.body;
-    console.log('entre: ', action, payload, producto)
+// Configuración de métricas Prometheus
+setupMetrics(app);
+
+// Función genérica para manejar solicitudes HTTP
+async function handleRequest(req, res, method, path, data = null) {
     try {
-        switch (action) {
-            case 'createOrder':
-                // Paso 1: Crear un pedido
-                console.log('crear el pedido')
-                await createOrder({body: payload.order}, res);
-                if (res.statusCode !== 200) throw new Error('Error creando el pedido');
+        const config = {method, url: path};
+        if (data) config.data = data;
 
-                // Paso 2: Procesar el pago
-                console.log('procesar pago')
-                await processPayment({body: payload.order}, res);
-                if (res.statusCode !== 200) throw new Error('Error procesando el pago');
-
-                // Paso 3: Actualizar inventario
-                console.log('actualizar inventario')
-                const path = 'http://stock-service/article/';
-
-                // Realiza la solicitud PUT con axios, adjuntando el body
-                const response = await axios.put(path, producto);
-
-                // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-                console.log('Responde stock: , ', JSON.stringify(response));
-                //res.json(response.data);
-                if (response.status !== 200) throw new Error('Error actualizando el inventario');
-
-                // Si todo sale bien
-                console.log('todo bien')
-                res.status(200).json({message: 'Orden de compra creada exitosamente'});
-                break;
-
-            default:
-                res.status(400).json({message: 'Acción no reconocida'});
-        }
+        const response = await axios(config);
+        res.json(response.data);
     } catch (error) {
-        console.log('error 1:', error.response ? error.response.data : error.message);
-        await compensate();
-        res.status(500).json({error: error.message});
-    }
-};
+        // Registra el error en el logger
+        logger.error(`Error en la solicitud ${method} ${path} | Request ID: ${req.id} | Error: ${error.message}`, {
+            requestData: data,
+            errorDetails: error.response?.data || error.message,
+            statusCode: error.response?.status,
+            url: path
+        });
 
-const compensate = async () => {
-    try {
-        await cancel({orderId: 1234});
-    } catch (error) {
-        console.error('Error en la compensación: ', error.message);
+        // Responde con un error 500 y detalles del fallo
+        res.status(500).json({
+            error: `Error connecting to ${path}`,
+            details: error.response?.data || 'No additional error data'
+        });
     }
-};*/
+}
 
 
 // Rutas de inventario
-app.get('/productos', async (req, res) => {
-    try {
-        // Realiza una solicitud a la URL contenida en `path`
-        const path = 'http://stock-service/article/all?ascendingOrder=true&comparator=article';
-        const response = await axios.get(path);
-        res.json(response.data); // Devuelve la respuesta obtenida
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path get all',
-            details: error.response?.data || 'No additional error data'
-        });
-    }
+app.get('/productos', (req, res) => {
+    handleRequest(req, res, 'get', `${config.stockServiceUrl}/article/all?ascendingOrder=true&comparator=article`);
 });
 
-app.post('/productos', async (req, res) => {
-    try {
-        const path = 'http://stock-service/article/';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create product',
-            details: error.response?.data || 'No additional error data'
-        });
-    }
+app.get('/productos/:id', (req, res) => {
+    handleRequest(req, res, 'get', `${config.stockServiceUrl}/article/?id=${req.params.id}`);
 });
 
-app.put('/actualizarProductos', async (req, res) => {
-    try {
-        const path = 'http://stock-service/article/';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.put(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create product',
-            details: error.response?.data || 'No additional error data'
-        });
-    }
+app.post('/productos', (req, res) => {
+    handleRequest(req, res, 'post', `${config.stockServiceUrl}/article/`, req.body);
 });
 
-app.post('/categorias', async (req, res) => {
-    try {
-        const path = 'http://stock-service/category/';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create product',
-            details: error.response?.data || 'No additional error data'
-        });
-    }
+app.put('/actualizarProductos', (req, res) => {
+    handleRequest(req, res, 'put', `${config.stockServiceUrl}/article/`, req.body);
 });
 
-app.post('/marcas', async (req, res) => {
-    try {
-        const path = 'http://stock-service/brand/';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create product',
-            details: error.response?.data || 'No additional error data'
-        });
-    }
+app.post('/categorias', (req, res) => {
+    handleRequest(req, res, 'post', `${config.stockServiceUrl}/category/`, req.body);
 });
 
-
-// Rutas de Compras
-/*app.post('/order', sagaMiddleware, (req, res) => {
-    console.log('saga res: ', JSON.stringify(res))
+app.post('/marcas', (req, res) => {
+    handleRequest(req, res, 'post', `${config.stockServiceUrl}/brand/`, req.body);
 });
-app.get('/obtenerCompras', async (req, res) => {
-    try {
-        // Realiza una solicitud a la URL contenida en `path`
-        const path = 'http://compras-service/compras';
-        const response = await axios.get(path);
-        res.json(response.data); // Devuelve la respuesta obtenida
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the get orders',
-            details: error.response?.data || 'No additional error data get orders'
-        });
-    }
-});
-
-app.post('/crearCompra', async (req, res) => {
-    try {
-        const path = 'http://compras-service/compras';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create orders',
-            details: error.response?.data || 'No additional error data create orders'
-        });
-    }
-});
-
-app.put('/actualizarCompra/:id', async (req, res) => {
-    try {
-        const {id} = req.params;
-        const path = `http://compras-service/compras/${id}`;
-        const body = req.body; // Captura el body de la solicitud PUT
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.put(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path update orders',
-            details: error.response?.data || 'No additional error data update orders'
-        });
-    }
-});
-
-app.delete('/borrarCompra/:id', async (req, res) => {
-    try {
-        const {id} = req.params;
-        const path = `http://compras-service/compras/${id}`;
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.put(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path delete orders',
-            details: error.response?.data || 'No additional error data delete orders'
-        });
-    }
-});*/
 
 
 // Rutas de Autenticación
-app.post('/validarToken', async (req, res) => {
-    try {
-        const path = 'http://143.198.177.50:30005/validar-token';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the token microservice',
-            details: error.response?.data || 'No additional error data token microservice'
-        });
-    }
+app.post('/validarToken', (req, res) => {
+    handleRequest(req, res, 'post', `${config.tokenService}/validar-token`, req.body);
 });
 
-app.post('/registrarUsuario', async (req, res) => {
-    try {
-        const path = 'http://143.198.177.50:30000/usuarios/registrar';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the user register microservice',
-            details: error.response?.data || 'No additional error data user register microservice'
-        });
-    }
+app.post('/registrarUsuario', (req, res) => {
+    handleRequest(req, res, 'post', `${config.authServiceUrl}/usuarios/registrar`, req.body);
 });
 
-app.post('/identificarUsuario', async (req, res) => {
-    try {
-        const path = 'http://143.198.177.50:30000/identificar-usuario';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the login microservice',
-            details: error.response?.data || 'No additional error data login microservice'
-        });
-    }
+app.post('/identificarUsuario', (req, res) => {
+    handleRequest(req, res, 'post', `${config.authServiceUrl}/identificar-usuario`, req.body);
 });
-
-
-// Rutas de pagos
-/*app.get('/obtenerPago/:id', async (req, res) => {
-    try {
-        const {id} = req.params;
-        const path = `http://pagos-service/pagos/${id}`;
-        const response = await axios.get(path);
-        res.json(response.data); // Devuelve la respuesta obtenida
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the get payment',
-            details: error.response?.data || 'No additional error data get payment'
-        });
-    }
-});
-
-app.post('/crearPago', async (req, res) => {
-    try {
-        const path = 'http://pagos-service/pagos';
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create payment',
-            details: error.response?.data || 'No additional error data create payment'
-        });
-    }
-});
-
-app.post('/procesarPago/:id', async (req, res) => {
-    try {
-        const {id} = req.params;
-        const path = `http://pagos-service/pagos/${id}/procesar`;
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path process payment',
-            details: error.response?.data || 'No additional error data process payment'
-        });
-    }
-});*/
 
 
 // Rutas de favoritos
-app.get('/obtenerFavoritos/:id', async (req, res) => {
+app.get('/obtenerFavoritos/:id', (req, res) => {
+    handleRequest(req, res, 'get', `${config.favoritesServiceUrl}/favorites/${req.params.id}`);
+});
+
+app.post('/crearFavorito', (req, res) => {
+    handleRequest(req, res, 'post', `${config.favoritesServiceUrl}/favorites`, req.body);
+});
+
+app.patch('/actualizarFavorito', (req, res) => {
+    handleRequest(req, res, 'patch', `${config.favoritesServiceUrl}/favorites`, req.body);
+});
+
+app.post('/borrarFavorito', (req, res) => {
+    handleRequest(req, res, 'post', `${config.favoritesServiceUrl}/favorites/delete`, req.body);
+});
+
+// Rutas Simulación Compras, Pagos y PATRON SAGA
+
+// Función genérica para simular operaciones con posible éxito/fallo
+function simulateOperation(successRate = 0.95) {
+    return Math.random() < successRate;
+}
+
+// Simulación de una compra
+async function simulatePurchase(data) {
+    logger.info(`Simulando compra: ${JSON.stringify(data)}`);
+    if (!simulateOperation()) {
+        throw new Error('Error en la simulación de compra.');
+    }
+    const purchaseId = uuidv4(); // Generar ID para la compra
+    logger.info(`Compra exitosa: ID ${purchaseId}`);
+    return purchaseId;
+}
+
+// Simulación de un pago
+async function simulatePayment(data) {
+    logger.info(`Simulando pago: ${JSON.stringify(data)}`);
+    if (!simulateOperation()) {
+        throw new Error('Error en la simulación de pago.');
+    }
+    const paymentId = uuidv4(); // Generar ID para el pago
+    logger.info(`Pago exitoso: ID ${paymentId}`);
+    return paymentId;
+}
+
+// Compensación: borrar la compra
+async function compensatePurchase(purchaseId) {
+    logger.info(`Compensando compra: ID ${purchaseId}`);
+    // Simula la eliminación de la compra
+    return `Compra con ID ${purchaseId} eliminada.`;
+}
+
+// Compensación: revertir el pago
+async function compensatePayment(paymentId) {
+    logger.info(`Revirtiendo pago: ID ${paymentId}`);
+    // Simula la reversión del pago
+    return `Pago con ID ${paymentId} revertido.`;
+}
+
+// Simulación del patrón Saga para una transacción de compra y pago
+async function simulateSaga(req, res) {
+    const {productos, total, token} = req.body;
+    let purchaseId, paymentId;
+
     try {
-        // Realiza una solicitud a la URL contenida en `path`
-        const {id} = req.params;
-        const path = `http://favorites-service/favorites/${id}`;
-        const response = await axios.get(path);
-        res.json(response.data); // Devuelve la respuesta obtenida
+        // Paso 0: Validar el token
+        const tokenValidationResponse = await validateToken(token);
+        if (!tokenValidationResponse || tokenValidationResponse.status !== 'succes') {
+            throw new Error('Token inválido');
+        }
+
+        // Paso 1: Simular compra
+        purchaseId = await simulatePurchase({productos});
+
+        // Paso 2: Simular pago
+        paymentId = await simulatePayment({total});
+
+        // Paso 3: Actualizar el inventario
+        await actualizarProductos(productos);
+
+        // Confirmar transacción
+        res.json({
+            message: 'Transacción completada exitosamente.',
+            purchaseId,
+            paymentId,
+        });
     } catch (error) {
+        logger.error(`Error en la transacción: ${error.message}`);
+
+        // Compensar pasos según lo que haya fallado
+        if (paymentId) await compensatePayment(paymentId);
+        if (purchaseId) await compensatePurchase(purchaseId);
+
         res.status(500).json({
-            error: 'Error connecting to the get favorites',
-            details: error.response?.data || 'No additional error data get favorites'
+            error: 'Transacción fallida. Se realizaron compensaciones.',
+            details: error.message,
         });
     }
-});
+}
 
-app.post('/crearFavorito', async (req, res) => {
+// Valido el token recibido antes de hacer peticiones a los microservicios
+async function validateToken(token) {
     try {
-        const path = `http://favorites-service/favorites`;
-        const body = req.body; // Captura el body de la solicitud POST
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
+        logger.info(`Validando token: ${token}`);
+        const response = await axios.post(`${config.tokenService}/validar-token`, token);
+        return response.data;
     } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path create favorites',
-            details: error.response?.data || 'No additional error data create favorites'
-        });
+        logger.error(`Error al validar el token: ${error.message}`);
+        return null; // Retornar null si falla la validación
     }
-});
+}
 
-app.patch('/actualizarFavorito', async (req, res) => {
+// Consulta el producto antes de actualizar para calcular si hay stock suficiente
+async function consultarProducto(productId) {
     try {
-        const path = `http://favorites-service/favorites`;
-        const body = req.body; // Captura el body de la solicitud PUT
-
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.patch(path, body);
-
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
+        logger.info(`Consultado producto: ${productId}`);
+        const response = await axios.get(`${config.stockServiceUrl}/article/?id=${productId}`);
+        return response.data; // Retorna los datos del producto
     } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path update favorites',
-            details: error.response?.data || 'No additional error data update favorites'
-        });
+        logger.error(`Error al consultar el producto con ID ${productId}: ${error.message}`);
+        throw new Error(`No se pudo consultar el producto con ID ${productId}.`);
     }
-});
+}
 
-app.post('/borrarFavorito', async (req, res) => {
-    try {
-        const path = `http://favorites-service/favorites/delete`;
-        const body = req.body; // Captura el body de la solicitud POST
+async function actualizarProductos(productos) {
+    logger.info(`Actualizando productos: ${productos}`);
+    // Mapear y procesar cada producto
+    const updatePromises = productos.map(async (producto) => {
+        // Consultar el producto actual en el inventario
+        const productoActual = await consultarProducto(producto.id);
 
-        // Realiza la solicitud POST con axios, adjuntando el body
-        const response = await axios.post(path, body);
+        if (!productoActual || !productoActual.stock) {
+            throw new Error(`Producto con ID ${producto.id} no encontrado o sin stock válido.`);
+        }
 
-        // Devuelve la respuesta del servicio en la respuesta de la API Gateway
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({
-            error: 'Error connecting to the provided path delete favorites',
-            details: error.response?.data || 'No additional error data delete favorites'
-        });
-    }
-});
+        // Calcular el nuevo stock
+        const nuevoStock = productoActual.stock - producto.cantidadComprada;
 
-// Exponer métricas para Prometheus
-app.get('/metrics', async (req, res) => {
-    res.set('Content-Type', promClient.contentType);
-    res.send(await promClient.metrics());
-});
+        if (nuevoStock < 0) {
+            throw new Error(`Stock insuficiente para el producto con ID ${producto.id}.`);
+        }
+
+        // Preparar el payload para actualizar el producto
+        const payload = {
+            id: productoActual.id,
+            name: productoActual.name,
+            description: productoActual.description,
+            stock: nuevoStock,
+            price: productoActual.price,
+            brandId: productoActual.brand.id,
+            categoryIds: productoActual.categories.map((categoria) => categoria.id),
+        };
+
+        // Actualizar el producto
+        await axios.put(`${config.stockServiceUrl}/article/`, payload);
+        logger.info(`Producto con ID ${producto.id} actualizado exitosamente. Nuevo stock: ${nuevoStock}`);
+    });
+
+    // Esperar a que todos los productos sean actualizados
+    await Promise.all(updatePromises);
+}
+
+
+// Rutas de compras y pagos
+app.post('/realizarCompra', simulateSaga);
+
 
 app.listen(PORT, () => {
     console.log(`API Gateway escuchando en el puerto ${PORT}`);
